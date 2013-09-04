@@ -2,7 +2,7 @@ EXTRAFLAGS:= -Wall -Werror -pedantic --std=c99 -ggdb -O0
 EXTRACPPFLAGS:= -Wall -Werror -pedantic -ggdb -O0 -Wno-long-long -Wno-variadic-macros -I.
 NASMEXTRAFLAGS:=-f elf64 -g -F dwarf 
 OBJS=lista_colgante.o
-COBJS=clista_colgante.o
+COBJS=lista_colgante.o
 HEADS=test-o-matic.h lista_colgante.h base.h
 EXE=main
 INCLUDE=-include /usr/include/errno.h

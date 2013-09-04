@@ -5,6 +5,8 @@ global lista_ahijar
 global lista_imprimir
 global lista_filtrar
 global lista_colapsar
+global nodo_crear
+global lista_colgar_descendiente
 
 global tiene_ceros_en_decimal
 global parte_decimal_mayor_que_un_medio
@@ -52,14 +54,16 @@ modoFOpen: DB 'a', 0
 
 ;-------constant structure strings-------
 
-llaveAbrir: DB ' { ', 0
-llaveCerrar: DB ' } ', 0
-corcheteAbrir: DB ' [ ', 0
-corcheteCerrar: DB ' ] ', 0
+llaveAbrir: DB '{ ', 0
+llaveCerrar: DB ' }', 0
+corcheteAbrir: DB '[ ', 0
+corcheteCerrar: DB ' ]', 0
+espacio: DB ' ', 0 
+listaVacia: DB '<vacia>', 0
 
 ;-------print structures--------
 
-printOneString: DB '%s', 0				;FIJARSE EN EL TP1 MAQUINA DE CASA!
+printOneString: DB '%s', 0
 string: DB '%s%s%s', 0
 double: DB '%f', 0
 int:	DB '%i', 0
@@ -72,12 +76,11 @@ lista_crear:
 
 	MOV rdi, TAM_LISTA
 	CALL malloc
-	MOV [rax], NULL
+	MOV qword[rax], NULL
 
 	POP rbp
 	ret
 
-section .text
 ; ~ nodo_t* nodo_crear(tipo_elementos tipo, valor_elemento value)
 nodo_crear:
 	PUSH rbp
@@ -86,26 +89,26 @@ nodo_crear:
 	PUSH r14
 	PUSH r13
 	SUB rsp, 8
-
+	
 	MOV r15, rdi
 	MOV r14, rsi
 	MOV rdi, TAM_NODO
 	CALL malloc
 	MOV r13, rax
 	MOV [r13 + offset_tipo], r15
-	MOV [r13 + offset_siguiente], NULL
-	MOV [r13 + offset_hijo], NULL
-	CMP ENUM_Double, r15
-	JE crearTipoDouble
+	MOV qword[r13 + offset_siguiente], NULL
+	MOV qword[r13 + offset_hijo], NULL
+	CMP r15, ENUM_double
+	JE .crearTipoDouble
 	MOV [r13 + offset_valor], r14
 	JMP .fin
 
-crearTipoDouble:
-	MOV [r13 + offset_valor], xmm0
+.crearTipoDouble:
+	MOVQ [r13 + offset_valor], xmm0
 
 .fin:
 	ADD rsp, 8
-	POP	r13
+	POP r13
 	POP r14
 	POP r15
 	POP rbp	
@@ -137,19 +140,19 @@ borrarNodos:
 	SUB rsp, 8
 
 	MOV r15, rdi
-	CMP [r15 + offset_siguiente], NULL
+	CMP qword [r15 + offset_siguiente], NULL
 	JE borrarHijos
 	MOV rdi, [r15 + offset_siguiente]
 	CALL borrarNodos
 
 borrarHijos:
-	CMP [r15 + offset_hijo], NULL
+	CMP qword [r15 + offset_hijo], NULL
 	JE borrarActual
 	MOV rdi, [r15 + offset_hijo]
 	CALL borrarNodos
 
 borrarActual:
-	CMP [r15 + offset_tipo], ENUM_string
+	CMP qword[r15 + offset_tipo], ENUM_string
 	JNE .fin
 	MOV rdi, [r15 + offset_valor]
 	CALL free
@@ -173,16 +176,27 @@ lista_imprimir:
 
 	MOV r15, rdi
 	MOV r14, rsi
-	MOV rsi, modoFOpens
+	MOV rsi, modoFOpen
 	MOV rdi, r14
 	CALL fopen
 	MOV r13, rax
+	CMP qword[r15], NULL
+	JE .ImprimirVacia
 	MOV rdi, r13
-	MOV rsi, [r15]
+	MOV rsi, [r15 + offset_primero]
 	CALL imprimirNodos
+	JMP .fin
+
+.ImprimirVacia:
+	MOV rdi, r13
+	MOV rsi, printOneString
+	MOV rdx, listaVacia
+	MOV rax, 1
+	CALL fprintf
+
+.fin:
 	MOV rdi, r13
 	CALL fclose
-
 	ADD rsp, 8
 	POP r13
 	POP r14
@@ -209,11 +223,11 @@ imprimirNodos:
 	MOV rsi, r14
 	CALL imprimirValor									;imprimo el valor
 
-	CMP [r14 + offset_hijo], NULL
+	CMP qword[r14 + offset_hijo], NULL
 	JE finalizarCadena
 	MOV rdi, r15
 	MOV rsi, [r14 + offset_hijo]
-	CALL imrprimirHijos
+	CALL imprimirHijos
 
 finalizarCadena:
 	MOV rdi, r15
@@ -222,10 +236,16 @@ finalizarCadena:
 	MOV rax, 1
 	CALL fprintf
 
-	CMP [r14 + offset_siguiente], NULL
+
+	CMP qword[r14 + offset_siguiente], NULL
 	JE .fin
 	MOV rdi, r15
-	MOV	rsi, [r14 + offset_siguiente]
+	MOV rsi, printOneString
+	MOV rdx, espacio
+	MOV rax, 1
+	CALL fprintf
+	MOV rdi, r15
+	MOV rsi, [r14 + offset_siguiente]
 	CALL imprimirNodos
 
 .fin:
@@ -243,27 +263,16 @@ imprimirHijos:
 
 	MOV r15, rdi
 	MOV r14, rsi
-	MOV rsi, printOneString
-	MOV rdx, corcheteAbrir
-	MOV rax, 1
-	CALL fprintf
-
-	CMP [r14 + offset_hijo], NULL
+	MOV rdi, r15
+	MOV rsi, r14
+	CALL imprimirValor
+	CMP qword[r14 + offset_hijo], NULL
 	JE .fin
 	MOV rdi, r15
 	MOV rsi, [r14 + offset_hijo]
 	CALL imprimirHijos
 
 .fin:
-	MOV rdi, r15
-	MOV rsi, r14
-	CALL imprimirValor
-	MOV rdi, r15
-	MOV rsi, printOneString
-	MOV rdx, corcheteCerrar
-	MOV rax, 1
-	CALL fprintf
-
 	POP r14
 	POP r15
 	POP rbp
@@ -280,26 +289,33 @@ imprimirValor:
 	MOV r14, rsi
 	MOV rsi, printOneString
 	MOV rdx, corcheteAbrir
+	MOV rax, 1
 	CALL fprintf
 	MOV rdi, r15
-	CMP [r14 + offset_tipo], ENUM_string
-	JE printString
-	CMP [r14 + offset_tipo], ENUM_double
-	JE printDouble
+	CMP dword[r14 + offset_tipo], ENUM_string
+	JE .printString
+	CMP dword [r14 + offset_tipo], ENUM_double
+	JE .printDouble
 	MOV rsi, int
 	MOV rdx, [r14 + offset_valor]
 	JMP .fin
 
-printString:
+.printString:
 	MOV rsi, string
 	MOV rdx, [r14 + offset_valor]
 	JMP .fin
 
-printDouble
+.printDouble:
 	MOV rsi, double
-	MOV xmm0, [r14 + offset_valor]
+	MOVQ xmm0, [r14 + offset_valor]
 
 .fin:
+	MOV rax, 1
+	CALL fprintf
+	MOV rdi, r15
+	MOV rsi, printOneString
+	MOV rdx, corcheteCerrar
+	MOV rax, 1
 	CALL fprintf
 	POP r14
 	POP r15
@@ -313,13 +329,43 @@ lista_concatenar:
 	PUSH r15
 	PUSH r14
 
-	MOV r15, [rdi]
+	MOV r15, rdi
 	MOV r14, rsi
+	CMP qword[r15], NULL
+	JE .cargarNodo
+	MOV r15, [r15 + offset_primero]
+	MOV rdi, r15
 	CALL buscarUltimo
 	MOV r15, rax
 	MOV [r15 + offset_siguiente], r14
+	JMP .fin
 
+.cargarNodo:
+	MOV [r15], r14
+
+.fin:
 	POP r14
+	POP r15
+	POP rbp
+	ret
+
+; ~ nodo_t* buscarUltimo(nodo_t *nodo)
+buscarUltimo:
+	PUSH rbp
+	MOV rbp, rsp	
+	PUSH r15
+	SUB rsp, 8
+	
+	MOV r15, rdi
+.loopSiguiente:
+	CMP qword [r15 + offset_siguiente], NULL
+	JE .fin
+	MOV r15, [r15 + offset_siguiente]
+	JMP .loopSiguiente
+
+.fin:
+	MOV rax, r15
+	ADD rsp, 8
 	POP r15
 	POP rbp
 	ret
@@ -344,10 +390,10 @@ buscarPosicion:
 	JMP buscarPosicion
 
 buscarHijo:
-	CMP [r15 + offset_hijo], NULL
-	JE ultimoHijo
+	CMP qword[r15 + offset_hijo], NULL
+	JE .fin
 	MOV r15, [r15 + offset_hijo]
-	JMP positionFound
+	JMP buscarHijo
 
 .fin:
 	MOV [r15 + offset_hijo], r13
