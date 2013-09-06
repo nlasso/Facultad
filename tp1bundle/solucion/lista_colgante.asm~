@@ -481,32 +481,11 @@ parte_decimal_mayor_que_un_medio:
 
 : ~ boolean tiene_numeros(nodo_t *n)
 tiene_numeros:
-	PUSH rbp	;A
+	PUSH rbp
 	MOV rbp, rsp
-	PUSH r15	;D
-	PUSH r14	;A
-
-	MOV r15, [rdi + offset_value]
-	MOV rdi, r15
-	CALL strlen
-	MOV r14, rax
-	MOV rdi, r15
-	MOV rsi, numeros
-	CALL strcspn
-	CMP rax, r14
-	JNE positivo
-	MOV rax, 0
-	JMP fin_g
-
-positivo:
-	MOV rax, 1
-	JMP fin_g
-
-fin_g:
-	POP r14
-	POP r15
 	POP rbp
 	ret
+
 
 
 
